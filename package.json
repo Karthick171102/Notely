@@ -1,0 +1,18 @@
+{
+  "name": "notely",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Notely — pin feedback on any prototype. Embeddable visual feedback tool.",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "dev": "npm run dev:server & npm run dev:web",
+    "build": "npm run build -w web",
+    "start": "npm run start -w server",
+    "seed": "npm run seed -w server"
+  }
+}
