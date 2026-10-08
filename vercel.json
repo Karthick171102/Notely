@@ -1,27 +1,30 @@
 {
-  "functions": {
-    "server/src/index.js": {
-      "memory": 1024,
-      "timeout": 30
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "server": {
+      "root": "server",
+      "framework": "express",
+      "buildCommand": "npm run build",
+      "port": 4000
+    },
+    "web": {
+      "root": "web",
+      "framework": "vite",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist"
     }
   },
-  "routes": [
-    { "source": "/api/(.*)", "destination": "server/src/index.js" },
-    { "source": "/embed/(.*)", "destination": "server/public/embed.js" },
-    { "source": "/(.*)", "destination": "web/dist/index.html" }
-  ],
-  "headers": [
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "server"
+      }
+    },
     {
       "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "Referrer-Policy", "value": "origin-when-cross-origin" }
-      ]
+      "destination": "web/dist/index.html"
     }
   ],
-  "env": {
-    "SUPABASE_URL": "@supabase_url",
-    "SUPABASE_ANON_KEY": "@supabase_anon_key"
-  }
+  "bindings": []
 }
