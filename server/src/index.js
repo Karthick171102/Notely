@@ -58,6 +58,6 @@ app.get(/^\/(?!api|embed).*/, (_req, res) => {
   res.sendFile(webIndex);
 });
 
-app.listen(PORT, () => {
-  console.log(`Notely server listening on http://localhost:${PORT}`);
-});
+// Export app for Vercel serverless functions
+// Vercel automatically handles the HTTP server
+export default app;
