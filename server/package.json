@@ -10,10 +10,12 @@
     "seed": "node src/seed.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "html2canvas": "^1.4.1",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^14.0.2"
   }
 }

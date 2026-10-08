@@ -76,9 +76,7 @@ export default function Login() {
           </p>
         </form>
 
-        {mode === 'login' && (
-          <p className="text-xs text-slate-400 text-center mt-4">Demo account: dana@contextly.test / password123</p>
-        )}
+        
       </div>
     </div>
   );
