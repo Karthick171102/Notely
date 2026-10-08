@@ -4,8 +4,7 @@
     "server": {
       "root": "server",
       "framework": "express",
-      "buildCommand": "npm run build",
-      "port": 4000
+      "buildCommand": "npm run build"
     },
     "web": {
       "root": "web",
@@ -25,6 +24,5 @@
       "source": "/(.*)",
       "destination": "web/dist/index.html"
     }
-  ],
-  "bindings": []
+  ]
 }
