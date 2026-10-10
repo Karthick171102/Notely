@@ -1,7 +1,7 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import db, { generateUuid } from '../db.js';
-import { signToken } from '../auth.js';
+import db, { uuid } from '../db.js';
+import { signToken, requireAuth } from '../auth.js';
 
 const router = Router();
 
@@ -15,19 +15,24 @@ router.post('/register', async (req, res) => {
   if (!password || password.length < 8)
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
-  const existing = await db.getUserByEmail(email.toLowerCase());
+  const existing = await db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
   if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
 
-  const id = generateUuid();
+  const id = uuid();
   const hash = bcrypt.hashSync(password, 10);
-  await db.createUser({ id, email: email.toLowerCase(), name: name.trim(), password_hash: hash });
+  await db.prepare('INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)').run(
+    id,
+    email.toLowerCase(),
+    name.trim(),
+    hash
+  );
 
   // Auto-create a personal workspace so every user has a home
-  const wsId = generateUuid();
+  const wsId = uuid();
   const wsName = `${name.trim().split(' ')[0]}'s Workspace`;
   const slug = wsName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + wsId.slice(0, 6);
-  await db.createWorkspace({ id: wsId, name: wsName, slug, brand_color: '#4f46e5', plan: 'free', owner_id: id });
-  await db.addWorkspaceMember({ id: generateUuid(), workspace_id: wsId, user_id: id, role: 'owner' });
+  await db.prepare('INSERT INTO workspaces (id, name, slug, owner_id) VALUES (?, ?, ?, ?)').run(wsId, wsName, slug, id);
+  await db.prepare('INSERT INTO workspace_members (id, workspace_id, user_id, role) VALUES (?, ?, ?, ?)').run(uuid(), wsId, id, 'owner');
 
   const user = { id, email: email.toLowerCase(), name: name.trim() };
   res.status(201).json({ token: signToken(user), user });
@@ -36,7 +41,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body ?? {};
   const user = emailOk(email)
-    ? await db.getUserByEmail(email.toLowerCase())
+    ? await db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase())
     : null;
   if (!user || !bcrypt.compareSync(password ?? '', user.password_hash))
     return res.status(401).json({ error: 'Invalid email or password' });
@@ -46,17 +51,8 @@ router.post('/login', async (req, res) => {
   });
 });
 
-router.get('/me', async (req, res) => {
-  // In Supabase-auth apps, the token is verified in the frontend
-  // This endpoint can return the user from the session
-  const token = req.headers.authorization?.replace('Bearer ', '') || '';
-  try {
-    // Verify token with Supabase - for now, just check if user exists in DB
-    const user = await db.getUserById('demo-user'); // placeholder - actual auth handled by Supabase
-    res.json({ user: user || null });
-  } catch {
-    res.json({ user: null });
-  }
+router.get('/me', requireAuth, async (req, res) => {
+  res.json({ user: req.user });
 });
 
 export default router;

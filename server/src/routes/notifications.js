@@ -5,16 +5,15 @@ import { requireAuth } from '../auth.js';
 const router = Router();
 router.use(requireAuth);
 
-router.get('/', (req, res) => {
-  const rows = db
-    .prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50')
+router.get('/', async (req, res) => {
+  const rows = await db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50')
     .all(req.user.id);
-  const unread = db.prepare('SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND read = 0').get(req.user.id).c;
+  const unread = await db.prepare('SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND read = 0').get(req.user.id).c;
   res.json({ notifications: rows.map((n) => ({ ...n, read: !!n.read })), unread });
 });
 
-router.post('/mark-read', (req, res) => {
-  db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.user.id);
+router.post('/mark-read', async (req, res) => {
+  await db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.user.id);
   res.json({ ok: true });
 });
 

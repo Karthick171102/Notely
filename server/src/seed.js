@@ -27,10 +27,10 @@ const projects = [
 
 const feedback = {
   'Acme Marketing Website': [
-    { title: 'Increase contrast on secondary button', content: 'The secondary button’s label sits at roughly 3:1 contrast against the background. Bump it to at least 4.5:1 and check the focus ring too.', type: 'accessibility', category: 'color', priority: 'high', status: 'open', author: 'Priya (Client)' },
+    { title: 'Increase contrast on secondary button', content: 'The secondary buttonΓÇÖs label sits at roughly 3:1 contrast against the background. Bump it to at least 4.5:1 and check the focus ring too.', type: 'accessibility', category: 'color', priority: 'high', status: 'open', author: 'Priya (Client)' },
     { title: 'Hero headline wraps awkwardly on tablet', content: 'At 768px the hero headline breaks mid-phrase leaving a one-word widow line. Adjust the max-width or use a balanced text wrap.', type: 'design_change', category: 'typography', priority: 'medium', status: 'in_progress', author: 'Sam (UX)' },
     { title: 'Dropdown closes before selection', content: 'On the contact form, the country dropdown closes on mousedown before an option can be selected. Reproduces in Chrome and Edge.', type: 'bug', category: 'interaction', priority: 'critical', status: 'in_progress', author: 'Marco (QA)' },
-    { title: 'Clarify pricing copy', content: '“Billed annually” is ambiguous — clarify whether monthly billing exists and what the discount is.', type: 'content', category: 'content', priority: 'low', status: 'open', author: 'Priya (Client)' },
+    { title: 'Clarify pricing copy', content: 'ΓÇ£Billed annuallyΓÇ¥ is ambiguous ΓÇö clarify whether monthly billing exists and what the discount is.', type: 'content', category: 'content', priority: 'low', status: 'open', author: 'Priya (Client)' },
     { title: 'Add loading state to submit button', content: 'The demo-request submit button gives no feedback while the request is in flight; users double-click. Add a spinner + disabled state.', type: 'ux', category: 'interaction', priority: 'medium', status: 'open', author: 'Sam (UX)' },
   ],
   'FinFlow Mobile App': [

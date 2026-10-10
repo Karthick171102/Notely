@@ -45,7 +45,7 @@ function titleCase(s) {
 
 function makeTitle(content) {
   const first = String(content).replace(/\s+/g, ' ').trim().split(/[.!?]/)[0] || String(content);
-  let t = first.length > 80 ? first.slice(0, 77) + '…' : first;
+  let t = first.length > 80 ? first.slice(0, 77) + 'ΓÇª' : first;
   t = t.charAt(0).toUpperCase() + t.slice(1);
   return t;
 }
@@ -70,12 +70,12 @@ function acceptanceCriteria(type, elementLabel) {
     'No regression on desktop, tablet, and mobile viewports (320px, 768px, 1440px).',
     'Behavior verified by a reviewer on the live prototype.',
   ];
-  if (type === 'accessibility') base.splice(1, 0, 'Contrast ratio ≥ 4.5:1 for text and ≥ 3:1 for UI boundaries.');
+  if (type === 'accessibility') base.splice(1, 0, 'Contrast ratio ΓëÑ 4.5:1 for text and ΓëÑ 3:1 for UI boundaries.');
   if (type === 'bug') base.splice(1, 0, 'The reported reproduction steps no longer produce the issue.');
   return base;
 }
 
-router.post('/refine', (req, res) => {
+router.post('/refine', async (req, res) => {
   const { content, element_label } = req.body ?? {};
   const text = String(content ?? '').trim();
   if (!text) return res.status(400).json({ error: 'Comment text is required' });
@@ -98,19 +98,19 @@ router.post('/refine', (req, res) => {
     clarified: vague ? clarify(text, type, element_label) : null,
     acceptance_criteria: acceptanceCriteria(type, element_label),
     notes: [
-      'Rule-based suggestion — review before applying.',
+      'Rule-based suggestion ΓÇö review before applying.',
       'Your original comment is never changed automatically.',
     ],
   });
 });
 
 // Developer brief for one feedback item (structured, AI-coding-agent ready)
-router.get('/brief/:feedbackId', (req, res) => {
-  const f = db.prepare('SELECT * FROM comments WHERE id = ?').get(req.params.feedbackId);
+router.get('/brief/:feedbackId', async (req, res) => {
+  const f = await db.prepare('SELECT * FROM comments WHERE id = ?').get(req.params.feedbackId);
   if (!f) return res.status(404).json({ error: 'Feedback not found' });
-  const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(f.project_id);
-  const round = f.round_id ? db.prepare('SELECT name FROM review_rounds WHERE id = ?').get(f.round_id) : null;
-  const version = f.version_id ? db.prepare('SELECT name FROM versions WHERE id = ?').get(f.version_id) : null;
+  const project = await db.prepare('SELECT name FROM projects WHERE id = ?').get(f.project_id);
+  const round = f.round_id ? await db.prepare('SELECT name FROM review_rounds WHERE id = ?').get(f.round_id) : null;
+  const version = f.version_id ? await db.prepare('SELECT name FROM versions WHERE id = ?').get(f.version_id) : null;
   const snap = JSON.parse(f.element_snapshot || '{}');
   const tech = JSON.parse(f.tech_meta || '{}');
   const elementLabel = snap.textSnippet || snap.tag || f.element_selector;
@@ -127,7 +127,7 @@ router.get('/brief/:feedbackId', (req, res) => {
       component: snap.tag ? `<${snap.tag}>` : null,
       region: f.region ? JSON.parse(f.region) : null,
     },
-    current_behavior: snap.textSnippet ? `Element currently reads “${snap.textSnippet}”.` : 'See selector and screenshot.',
+    current_behavior: snap.textSnippet ? `Element currently reads ΓÇ£${snap.textSnippet}ΓÇ¥.` : 'See selector and screenshot.',
     expected_behavior: f.title || f.content,
     acceptance_criteria: acceptanceCriteria(detect(TYPE_HINTS, f.content) ?? 'design', elementLabel),
     technical_context: {
@@ -150,7 +150,7 @@ function briefToMarkdown(b) {
     `# ${b.title}`,
     '',
     `**Reference:** ${b.reference}  `,
-    `**Project:** ${b.project} · Round: ${b.review_round} · Version: ${b.version}`,
+    `**Project:** ${b.project} ┬╖ Round: ${b.review_round} ┬╖ Version: ${b.version}`,
     '',
     '## Context',
     b.context,

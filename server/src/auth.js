@@ -10,9 +10,8 @@ export function signToken(user) {
   });
 }
 
-export function getWorkspaceId(userId) {
-  const ws = db
-    .prepare(
+export async function getWorkspaceId(userId) {
+  const ws = await db.prepare(
       `SELECT w.id FROM workspaces w
        LEFT JOIN workspace_members m ON m.workspace_id = w.id AND m.user_id = ?
        WHERE w.owner_id = ? OR m.user_id = ?
@@ -22,14 +21,13 @@ export function getWorkspaceId(userId) {
   return ws?.id ?? null;
 }
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Authentication required' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = db
-      .prepare('SELECT id, email, name, created_at FROM users WHERE id = ?')
+    const user = await db.prepare('SELECT id, email, name, created_at FROM users WHERE id = ?')
       .get(payload.sub);
     if (!user) return res.status(401).json({ error: 'User no longer exists' });
     req.user = user;

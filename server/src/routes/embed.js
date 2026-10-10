@@ -27,8 +27,8 @@ function rateLimit(req, res, next) {
   next();
 }
 
-function projectByToken(tokenOrId) {
-  return db.prepare('SELECT * FROM projects WHERE embed_token = ? OR id = ?').get(tokenOrId, tokenOrId);
+async function projectByToken(tokenOrId) {
+  return await db.prepare('SELECT * FROM projects WHERE embed_token = ? OR id = ?').get(tokenOrId, tokenOrId);
 }
 
 function originAllowed(project, origin) {
@@ -82,20 +82,20 @@ function publicComment(c) {
 }
 
 // Project meta for the embed panel header
-router.get('/:token/meta', (req, res) => {
-  const p = projectByToken(req.params.token);
+router.get('/:token/meta', async (req, res) => {
+  const p = await projectByToken(req.params.token);
   if (!p) return res.status(404).json({ error: 'Unknown embed token' });
   const origin = req.headers.origin;
   if (!originAllowed(p, origin)) return res.status(403).json({ error: 'This domain is not allowed to use this embed' });
 
   const round = req.query.round_id
-    ? db.prepare('SELECT * FROM review_rounds WHERE id = ? AND project_id = ?').get(String(req.query.round_id), p.id)
-    : db.prepare(`SELECT * FROM review_rounds WHERE project_id = ? AND status = 'active' ORDER BY created_at ASC LIMIT 1`).get(p.id);
+    ? await db.prepare('SELECT * FROM review_rounds WHERE id = ? AND project_id = ?').get(String(req.query.round_id), p.id)
+    : await db.prepare(`SELECT * FROM review_rounds WHERE project_id = ? AND status = 'active' ORDER BY created_at ASC LIMIT 1`).get(p.id);
   const version = round
-    ? db.prepare('SELECT * FROM versions WHERE round_id = ? ORDER BY created_at DESC LIMIT 1').get(round.id)
+    ? await db.prepare('SELECT * FROM versions WHERE round_id = ? ORDER BY created_at DESC LIMIT 1').get(round.id)
     : null;
   const approvalCount = round
-    ? db.prepare(`SELECT COUNT(*) AS c FROM approvals WHERE round_id = ? AND status = 'approved'`).get(round.id).c
+    ? await db.prepare(`SELECT COUNT(*) AS c FROM approvals WHERE round_id = ? AND status = 'approved'`).get(round.id).c
     : 0;
 
   res.json({
@@ -107,25 +107,25 @@ router.get('/:token/meta', (req, res) => {
 });
 
 // Client approval / change request from the embed panel
-router.post('/:token/approvals', rateLimit, (req, res) => {
-  const p = projectByToken(req.params.token);
+router.post('/:token/approvals', rateLimit, async (req, res) => {
+  const p = await projectByToken(req.params.token);
   if (!p) return res.status(404).json({ error: 'Unknown embed token' });
   const origin = req.headers.origin;
   if (!originAllowed(p, origin)) return res.status(403).json({ error: 'This domain is not allowed' });
 
   const { round_id, status, note, signed_name, reviewer_name, reviewer_email } = req.body ?? {};
   const round = round_id
-    ? db.prepare('SELECT * FROM review_rounds WHERE id = ? AND project_id = ?').get(round_id, p.id)
-    : db.prepare(`SELECT * FROM review_rounds WHERE project_id = ? ORDER BY created_at DESC LIMIT 1`).get(p.id);
+    ? await db.prepare('SELECT * FROM review_rounds WHERE id = ? AND project_id = ?').get(round_id, p.id)
+    : await db.prepare(`SELECT * FROM review_rounds WHERE project_id = ? ORDER BY created_at DESC LIMIT 1`).get(p.id);
   if (!round) return res.status(404).json({ error: 'No review round found' });
   if (!['approved', 'changes_requested'].includes(status))
     return res.status(400).json({ error: 'status must be approved or changes_requested' });
   if (!signed_name || !String(signed_name).trim())
     return res.status(400).json({ error: 'Type your name to confirm this decision' });
 
-  const version = db.prepare('SELECT * FROM versions WHERE round_id = ? ORDER BY created_at DESC LIMIT 1').get(round.id);
+  const version = await db.prepare('SELECT * FROM versions WHERE round_id = ? ORDER BY created_at DESC LIMIT 1').get(round.id);
   const id = uuid();
-  db.prepare(
+  await db.prepare(
     `INSERT INTO approvals (id, round_id, version_id, reviewer_name, reviewer_email, status, note, signed_name)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
@@ -138,21 +138,20 @@ router.post('/:token/approvals', rateLimit, (req, res) => {
     note ? sanitize(note).slice(0, 2000) : null,
     sanitize(signed_name).trim().slice(0, 80)
   );
-  logActivity(p.id, null, `approval.${status}`, { round: round.name, via: 'embed' });
-  const owner = db.prepare('SELECT id FROM users WHERE id = ?').get(p.owner_id);
+  await logActivity(p.id, null, `approval.${status}`, { round: round.name, via: 'embed' });
+  const owner = await db.prepare('SELECT id FROM users WHERE id = ?').get(p.owner_id);
   if (owner)
-    notifyUser(owner.id, p.id, `approval.${status}`, `Client ${status === 'approved' ? 'approved' : 'requested changes on'} “${round.name}” (${p.name})`);
-  res.status(201).json({ approval: db.prepare('SELECT * FROM approvals WHERE id = ?').get(id) });
+    await notifyUser(owner.id, p.id, `approval.${status}`, `Client ${status === 'approved' ? 'approved' : 'requested changes on'} ΓÇ£${round.name}ΓÇ¥ (${p.name})`);
+  res.status(201).json({ approval: await db.prepare('SELECT * FROM approvals WHERE id = ?').get(id) });
 });
 
 // Public comments for this project (internal notes excluded)
-router.get('/:token/comments', rateLimit, (req, res) => {
-  const p = projectByToken(req.params.token);
+router.get('/:token/comments', rateLimit, async (req, res) => {
+  const p = await projectByToken(req.params.token);
   if (!p) return res.status(404).json({ error: 'Unknown embed token' });
   const origin = req.headers.origin;
   if (!originAllowed(p, origin)) return res.status(403).json({ error: 'This domain is not allowed to use this embed' });
-  const rows = db
-    .prepare(
+  const rows = await db.prepare(
       `SELECT c.*, r.name AS round_name, v.name AS version_name FROM comments c
        LEFT JOIN review_rounds r ON r.id = c.round_id
        LEFT JOIN versions v ON v.id = c.version_id
@@ -173,8 +172,8 @@ router.get('/:token/comments', rateLimit, (req, res) => {
 });
 
 // Create a comment from the embed script (element OR region target, with screenshot + tech metadata)
-router.post('/:token/comments', rateLimit, (req, res) => {
-  const p = projectByToken(req.params.token);
+router.post('/:token/comments', rateLimit, async (req, res) => {
+  const p = await projectByToken(req.params.token);
   if (!p) return res.status(404).json({ error: 'Unknown embed token' });
   const origin = req.headers.origin;
   if (!originAllowed(p, origin))
@@ -200,19 +199,17 @@ router.post('/:token/comments', rateLimit, (req, res) => {
 
   // Bind to the requested review round (or the project's default) and its latest version
   let round = round_id
-    ? db.prepare('SELECT * FROM review_rounds WHERE id = ? AND project_id = ?').get(round_id, p.id)
+    ? await db.prepare('SELECT * FROM review_rounds WHERE id = ? AND project_id = ?').get(round_id, p.id)
     : null;
   if (!round) {
-    round = db
-      .prepare(`SELECT * FROM review_rounds WHERE project_id = ? AND status = 'active' ORDER BY created_at ASC LIMIT 1`)
+    round = await db.prepare(`SELECT * FROM review_rounds WHERE project_id = ? AND status = 'active' ORDER BY created_at ASC LIMIT 1`)
       .get(p.id);
   }
-  if (!round) ({ round } = ensureDefaultRound(p.id, null));
-  const version = db
-    .prepare('SELECT * FROM versions WHERE round_id = ? ORDER BY created_at DESC LIMIT 1')
+  if (!round) ({ round } = await ensureDefaultRound(p.id, null));
+  const version = await db.prepare('SELECT * FROM versions WHERE round_id = ? ORDER BY created_at DESC LIMIT 1')
     .get(round.id);
 
-  // Optional annotated screenshot (dataURL) → saved to disk
+  // Optional annotated screenshot (dataURL) ΓåÆ saved to disk
   let screenshotUrl = null;
   if (typeof screenshot === 'string' && screenshot.startsWith('data:image/')) {
     try {
@@ -232,9 +229,9 @@ router.post('/:token/comments', rateLimit, (req, res) => {
   const CATEGORIES = ['layout', 'typography', 'color', 'spacing', 'interaction', 'navigation', 'content', 'responsive', 'accessibility', 'technical'];
 
   const id = uuid();
-  const ref = nextRef(p.id);
+  const ref = await nextRef(p.id);
   const cleanTitle = title ? sanitize(title).slice(0, 200) : text.split(/[.!?\n]/)[0].slice(0, 80);
-  db.prepare(
+  await db.prepare(
     `INSERT INTO comments (id, project_id, author_id, author_name, author_email,
        element_selector, element_snapshot, region, round_id, version_id, screenshot_url, tech_meta,
        page_url, page_path, content, title, type, category, priority, ref)
@@ -260,14 +257,13 @@ router.post('/:token/comments', rateLimit, (req, res) => {
     ['low', 'medium', 'high', 'critical'].includes(priority) ? priority : 'medium',
     ref
   );
-  logActivity(p.id, null, 'comment.created', { id, via: 'embed' });
+  await logActivity(p.id, null, 'comment.created', { id, via: 'embed' });
 
   // Notify the project owner about new guest feedback
-  const owner = db.prepare('SELECT id FROM users WHERE id = ?').get(p.owner_id);
-  if (owner) notifyUser(owner.id, p.id, 'new_feedback', `New feedback ${ref} on “${p.name}”: ${cleanTitle}`, ref);
+  const owner = await db.prepare('SELECT id FROM users WHERE id = ?').get(p.owner_id);
+  if (owner) await notifyUser(owner.id, p.id, 'new_feedback', `New feedback ${ref} on ΓÇ£${p.name}ΓÇ¥: ${cleanTitle}`, ref);
 
-  const row = db
-    .prepare(
+  const row = await db.prepare(
       `SELECT c.*, r.name AS round_name, v.name AS version_name FROM comments c
        LEFT JOIN review_rounds r ON r.id = c.round_id
        LEFT JOIN versions v ON v.id = c.version_id
@@ -278,16 +274,15 @@ router.post('/:token/comments', rateLimit, (req, res) => {
 });
 
 // Reply to a comment from the embed script
-router.post('/:token/comments/:id/replies', rateLimit, (req, res) => {
-  const p = projectByToken(req.params.token);
+router.post('/:token/comments/:id/replies', rateLimit, async (req, res) => {
+  const p = await projectByToken(req.params.token);
   if (!p) return res.status(404).json({ error: 'Unknown embed token' });
   const origin = req.headers.origin;
   if (!originAllowed(p, origin))
     return res.status(403).json({ error: 'This domain is not allowed to submit feedback' });
   if (!p.is_public) return res.status(403).json({ error: 'This project is invite-only' });
 
-  const parent = db
-    .prepare('SELECT * FROM comments WHERE id = ? AND project_id = ? AND parent_comment_id IS NULL')
+  const parent = await db.prepare('SELECT * FROM comments WHERE id = ? AND project_id = ? AND parent_comment_id IS NULL')
     .get(req.params.id, p.id);
   if (!parent) return res.status(404).json({ error: 'Comment not found' });
 
@@ -296,7 +291,7 @@ router.post('/:token/comments/:id/replies', rateLimit, (req, res) => {
   if (!text) return res.status(400).json({ error: 'Reply text is required' });
 
   const id = uuid();
-  db.prepare(
+  await db.prepare(
     `INSERT INTO comments (id, project_id, parent_comment_id, author_name, element_selector, element_snapshot, page_url, page_path, content)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
@@ -310,14 +305,14 @@ router.post('/:token/comments/:id/replies', rateLimit, (req, res) => {
     parent.page_path,
     text
   );
-  logActivity(p.id, null, 'comment.replied', { id, parent: parent.id, via: 'embed' });
-  const row = db.prepare('SELECT * FROM comments WHERE id = ?').get(id);
+  await logActivity(p.id, null, 'comment.replied', { id, parent: parent.id, via: 'embed' });
+  const row = await db.prepare('SELECT * FROM comments WHERE id = ?').get(id);
   res.status(201).json({ comment: publicComment(row) });
 });
 
 // Public rule-based AI assist for the embed composer (no auth; origin-checked)
-router.post('/:token/ai-refine', rateLimit, (req, res) => {
-  const p = projectByToken(req.params.token);
+router.post('/:token/ai-refine', rateLimit, async (req, res) => {
+  const p = await projectByToken(req.params.token);
   if (!p) return res.status(404).json({ error: 'Unknown embed token' });
   if (!originAllowed(p, req.headers.origin)) return res.status(403).json({ error: 'Domain not allowed' });
   const { content, element_label } = req.body ?? {};
@@ -347,7 +342,7 @@ router.post('/:token/ai-refine', rateLimit, (req, res) => {
     ['responsive', ['mobile', 'tablet', 'viewport', 'responsive']],
   ], 'layout');
   const vague = text.length < 25 || /^(fix this|looks wrong|bad|ugly|weird)\b/i.test(text);
-  const where = element_label ? ` (“${element_label}”)` : '';
+  const where = element_label ? ` (ΓÇ£${element_label}ΓÇ¥)` : '';
   const title = text.replace(/\s+/g, ' ').split(/[.!?]/)[0].slice(0, 80);
   const clarified = vague
     ? `Address this feedback${where}: ${text.trim()}. Align the element with the design system and verify the result at desktop and mobile widths.`.slice(0, 500)
@@ -359,7 +354,7 @@ router.post('/:token/ai-refine', rateLimit, (req, res) => {
     category,
     priority_suggestion: /(critical|broken|crash|blocker)/i.test(t) ? 'high' : /(minor|nit|cosmetic|maybe)/i.test(t) ? 'low' : 'medium',
     clarified,
-    notes: ['Rule-based suggestion — review before applying. Your original comment is never changed automatically.'],
+    notes: ['Rule-based suggestion ΓÇö review before applying. Your original comment is never changed automatically.'],
   });
 });
 
